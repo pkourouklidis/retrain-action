@@ -1,0 +1,23 @@
+FROM debian:11-slim AS build
+RUN apt-get update && \
+    apt-get install --no-install-suggests --no-install-recommends --yes python3-pip && \
+    pip install pipenv
+
+FROM build AS build-pipenv
+
+ENV PIPENV_VENV_IN_PROJECT=1
+ADD Pipfile.lock Pipfile /build/
+WORKDIR /build
+RUN pipenv sync
+
+#Runtime
+FROM gcr.io/distroless/python3-debian11 AS runtime
+
+COPY --from=build-pipenv /build/.venv/ /app/.venv/
+# Copy source files
+COPY app.py /app
+COPY project/ /app/project/
+WORKDIR /app
+# Start application
+ENV FLASK_APP=/app/app.py
+ENTRYPOINT ["/app/.venv/bin/python", "-m", "flask", "run", "--host=0.0.0.0"]
